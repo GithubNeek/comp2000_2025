@@ -1,16 +1,35 @@
 import java.awt.*;
 
-public class SandCell extends Cell implements Walkable {
-    public SandCell(char col, int row, int x, int y) { super(col, row, x, y); }
+public class SandCell extends Cell { 
 
-    public int moveCost() { return 2; }
+    public SandCell(char inLabel, int inRow, int inCol, int x, int y) { 
+        super(inLabel, inRow, inCol, x, y); 
+    }
 
+
+    @Override
+    public Color getColor() {
+        return new Color(230, 210, 140);
+    }
+    
+    @Override
+    public boolean isWalkable() {
+        return true; 
+    }
+    
+    @Override
+    public int getMovementCost() { 
+        return 2; 
+    }
+
+    @Override
     public void paint(Graphics g, Point mousePos) {
         
-        g.setColor(new Color(230, 210, 140));
+        g.setColor(getColor());
         g.fillRect(x, y, size, size);
+        
         g.setColor(new Color(210, 190, 120));
-        g.drawLine(x, y + size - 1, x + size - 1, y + size - 1); // tiny shadow line
+        g.drawLine(x, y + size - 1, x + size - 1, y + size - 1); 
         g.setColor(Color.BLACK);
         g.drawRect(x, y, size, size);
     }

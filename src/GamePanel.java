@@ -1,12 +1,19 @@
-import javax.swing.*;
+
+
 import java.awt.*;
 import java.awt.event.*;
+import java.util.List;
+import java.util.Optional;
+import javax.swing.*; 
 
-public class GamePanel extends JPanel implements KeyListener, MouseMotionListener {
+public class GamePanel extends JPanel implements KeyListener, MouseMotionListener, WeatherObserver {
     Grid<Cell> grid;
     Player player;
     Point mousePos = new Point(0, 0);
     boolean won = false;
+    boolean gameOver = false; 
+    
+    private WeatherEvent currentLegacyWeather = WeatherEvent.SUNNY; 
 
     public GamePanel(Grid<Cell> g, Player p) {
         grid = g;
@@ -18,25 +25,35 @@ public class GamePanel extends JPanel implements KeyListener, MouseMotionListene
         addKeyListener(this);
         addMouseMotionListener(this);
     }
+    
+    @Override
+    public void updateWeather(List<WeatherDataPoint> weatherData) {
+        repaint(); 
+    }
 
+    @Override
+    public void updateLegacyWeather(WeatherEvent event) {
+        this.currentLegacyWeather = event;
+        repaint();
+    }
+    
     public void paintComponent(Graphics g) {
         super.paintComponent(g);
+        grid.paint(g, mousePos); 
+        
+       
 
-        // draw all cells
-        for (int r = 0; r < grid.rows(); r++) {
-            for (int c = 0; c < grid.cols(); c++) {
-                grid.get(r, c).paint(g, mousePos);
-            }
-        }
+       
+        g.setFont(new Font("SansSerif", Font.BOLD, 14));
+        g.setColor(Color.BLACK);
+        g.drawString("Fuel: " + player.getFuel(), 8, 32); 
 
-        // highlight GOAL (bottom-right) with a gold outline
         int gr = grid.rows() - 1, gc = grid.cols() - 1;
         int gx = gc * Cell.size, gy = gr * Cell.size;
         g.setColor(Color.YELLOW);
         g.drawRect(gx + 2, gy + 2, Cell.size - 4, Cell.size - 4);
         g.drawRect(gx + 4, gy + 4, Cell.size - 8, Cell.size - 8);
 
-        // draw PLAYER
         int px = player.c * Cell.size, py = player.r * Cell.size;
         int pad = 6;
         g.setColor(Color.RED);
@@ -44,20 +61,76 @@ public class GamePanel extends JPanel implements KeyListener, MouseMotionListene
         g.setColor(Color.BLACK);
         g.drawOval(px + pad, py + pad, Cell.size - 2 * pad, Cell.size - 2 * pad);
 
-        // HUD text
-        g.setFont(new Font("SansSerif", Font.BOLD, 14));
+        String instructionText = "Move: W/A/S/D | Goal: Reach the yellow square!";
+        int instructionY = grid.rows() * Cell.size - 8;
+        Font instructionFont = new Font("SansSerif", Font.BOLD, 16);
+        g.setFont(instructionFont);
+        
+        FontMetrics fm = g.getFontMetrics(instructionFont);
+        int textWidth = fm.stringWidth(instructionText);
+        int instructionX = (grid.cols() * Cell.size - textWidth) / 2;
+
         g.setColor(Color.BLACK);
-        g.drawString("Goal: reach the yellow square (W/A/S/D)", 8, 16);
+        g.drawString(instructionText, instructionX + 1, instructionY + 1);
+        
+        g.setColor(Color.WHITE);
+        g.drawString(instructionText, instructionX, instructionY);
+
+
+        Color overlayColor = null;
+        int width = grid.cols() * Cell.size;
+        int height = grid.rows() * Cell.size;
+
+        if (currentLegacyWeather == WeatherEvent.SUNNY) {
+            overlayColor = new Color(255, 180, 0, 60); 
+        } else if (currentLegacyWeather == WeatherEvent.SNOW) {
+            overlayColor = new Color(255, 255, 255, 90);
+        } else if (currentLegacyWeather == WeatherEvent.RAIN) {
+            overlayColor = new Color(50, 50, 100, 90); 
+        }
+
+        if (overlayColor != null) {
+            g.setColor(overlayColor);
+            g.fillRect(0, 0, width, height);
+        }
 
         if (won) {
             g.setFont(new Font("SansSerif", Font.BOLD, 24));
             g.setColor(new Color(0, 150, 0));
             g.drawString("You Win!", 20, 50);
         }
+        
+        if (gameOver) {
+            g.setFont(new Font("SansSerif", Font.BOLD, 24));
+            g.setColor(new Color(150, 0, 0));
+            g.drawString("Game Over: Out of Fuel!", 20, 70);
+        }
+    }
+    
+
+    private void checkGameOver() {
+        if (player.getFuel() <= 0 && !won) {
+            gameOver = true;
+            repaint();
+            
+            int choice = JOptionPane.showConfirmDialog(
+                this, 
+                "You ran out of fuel! The game is over. Try again?", 
+                "Game Over", 
+                JOptionPane.YES_NO_OPTION,
+                JOptionPane.ERROR_MESSAGE
+            );
+
+            if (choice == JOptionPane.YES_OPTION) {
+                Main.restartGame(); 
+            } else {
+                System.exit(0);
+            }
+        }
     }
 
     public void keyPressed(KeyEvent e) {
-        if (won) return;
+        if (won || gameOver) return; 
 
         char ch = Character.toUpperCase(e.getKeyChar());
         int dr = 0, dc = 0;
@@ -70,20 +143,28 @@ public class GamePanel extends JPanel implements KeyListener, MouseMotionListene
         int nr = player.r + dr, nc = player.c + dc;
         if (!grid.inBounds(nr, nc)) return;
 
-        Cell target = grid.get(nr, nc);
-        if (player.tryMoveTo(target)) {
-            player.r = nr;
-            player.c = nc;
-            repaint();
-
-            // win condition: bottom-right cell
-            if (player.r == grid.rows() - 1 && player.c == grid.cols() - 1) {
-                won = true;
+        Optional<Cell> targetCell = grid.getCell(nr, nc); 
+        
+        if (targetCell.isPresent()) {
+            Cell target = targetCell.get();
+            
+            if (player.tryMoveTo(target)) {
+                player.r = nr;
+                player.c = nc;
                 repaint();
-                JOptionPane.showMessageDialog(this, "You reached the goal!");
+
+                if (player.r == grid.rows() - 1 && player.c == grid.cols() - 1) {
+                    won = true;
+                    repaint();
+                    JOptionPane.showMessageDialog(this, "You reached the goal!");
+                }
+                
+                checkGameOver();
+                
+            } else {
+                Toolkit.getDefaultToolkit().beep();
+                checkGameOver(); 
             }
-        } else {
-            Toolkit.getDefaultToolkit().beep(); // blocked (e.g., water)
         }
     }
 

@@ -1,23 +1,40 @@
-import java.awt.*;
+import java.awt.Color;
+import java.awt.Graphics;
+import java.awt.Point;
 
-public class GrassCell extends Cell implements Walkable {
-    public GrassCell(char col, int row, int x, int y){
-        super(col, row, x, y);
+public class GrassCell extends Cell {
+
+    public GrassCell(char inLabel, int inRow, int inCol, int x, int y) {
+        super(inLabel, inRow, inCol, x, y); 
+    }
+    
+
+    @Override
+    public Color getColor() {
+        return new Color(102, 179, 88); 
     }
 
-    public int moveCost() {
-        return 1;
+    @Override
+    public boolean isWalkable() {
+        return true; 
+    }
+    
+    @Override
+    public int getMovementCost() {
+        return 1; 
     }
 
+    @Override
     public void paint(Graphics g, Point mousePos) {
-        if (contains(mousePos)) {
-            g.setColor(new Color(180, 220, 180)); 
-        } else {
-            g.setColor(new Color(160, 200, 160)); 
-        }
-        g.fillRect(x, y, size, size); 
+        g.setColor(getColor());
+        g.fillRect(x, y, size, size);
+        
+        g.setColor(Color.DARK_GRAY);
+        g.drawRect(x, y, size, size);
 
-        g.setColor(Color.BLACK);
-        g.drawRect(x, y, size, size); 
+        if (contains(mousePos)) {
+            g.setColor(new Color(255, 255, 255, 80)); 
+            g.fillRect(x, y, size, size);
+        }
     }
 }
